@@ -1517,16 +1517,34 @@ def pass_execution_and_save(func, gm, inp, msg):
         )
 
 
-def is_collective(node):
+def is_collective(node, op=None):
     from . import ir
 
-    return type(node) == ir._CollectiveKernel
+    return type(node) == ir._CollectiveKernel and (op is None or node.op_overload is op)
 
 
 def is_wait(node):
     from . import ir
 
     return type(node) == ir._WaitKernel
+
+
+def contains_collective(snode):
+    from torch._inductor.scheduler import GroupedSchedulerNode
+
+    if isinstance(snode, GroupedSchedulerNode):
+        return any(contains_collective(subnode) for subnode in snode.snodes)
+    else:
+        return is_collective(snode.node)
+
+
+def contains_wait(snode):
+    from torch._inductor.scheduler import GroupedSchedulerNode
+
+    if isinstance(snode, GroupedSchedulerNode):
+        return any(contains_wait(subnode) for subnode in snode.snodes)
+    else:
+        return is_wait(snode.node)
 
 
 def num_fw_fixed_arguments(dynamo_gm_num_inputs: int, aot_fw_gm_num_inputs: int):
